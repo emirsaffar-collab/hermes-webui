@@ -94,6 +94,7 @@ _AGENT_SOURCE_DIR: Path | None = None
 _AGENT_MODULE_PATH: Path | None = None
 _AGENT_REVISION: str | None = None
 _AIAgent = None
+_SHELL_HOOKS_REGISTERED = False
 _RUNTIME_LOCK = threading.Lock()
 
 
@@ -152,12 +153,45 @@ def require_ai_agent_class():
     return AIAgent
 
 
+def _register_config_shell_hooks_once() -> None:
+    """Register config.yaml shell hooks (destructive-guard, recipient-guard, ...) for this process.
+
+    WHY (2026-09-07): the WebUI imports AIAgent directly, bypassing ``hermes_cli.main``
+    startup — the ONLY path that registers config-owned shell hooks. Result: every
+    in-process WebUI session ran with ZERO guard hooks while CLI/gateway/cron sessions
+    were guarded (proven: ``rm -rf`` probes passed in WebUI sessions, blocked in ``-z``).
+    Mirrors main.py:2798 — same call, same allowlist semantics (hooks_auto_accept from
+    config governs; non-allowlisted hooks are skipped+logged, never auto-wired).
+    Idempotent: agent.shell_hooks keeps its own per-home registration set.
+    """
+    global _SHELL_HOOKS_REGISTERED
+    if _SHELL_HOOKS_REGISTERED:
+        return
+    _SHELL_HOOKS_REGISTERED = True
+    try:
+        from hermes_cli.config import load_config
+        from agent.shell_hooks import register_from_config
+
+        register_from_config(load_config())
+        from agent.outbound_webhooks import register_from_config as register_webhooks
+
+        register_webhooks(load_config())
+    except Exception:
+        _SHELL_HOOKS_REGISTERED = False
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "config shell-hook registration failed in WebUI process", exc_info=True
+        )
+
+
 def get_ai_agent_class():
     """Return ``AIAgent`` while preserving the existing lazy-import retry."""
     global _AIAgent, _AGENT_REVISION
 
     with _RUNTIME_LOCK:
         ensure_agent_runtime_current()
+        _register_config_shell_hooks_once()
         if _AIAgent is None:
             try:
                 agent_class = require_ai_agent_class()
