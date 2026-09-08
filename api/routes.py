@@ -23017,6 +23017,14 @@ def _agent_runtime_barrier_response(
     try:
         ensure_agent_runtime_current()
     except AgentRuntimeChangedError as exc:
+        # Schedule background self-heal (exit-for-revive when idle) without
+        # affecting the typed fail-closed response this caller still returns.
+        try:
+            from api.runtime_selfheal import maybe_self_heal
+
+            maybe_self_heal(stale_detected=True)
+        except Exception:
+            logger.warning("self-heal scheduling failed", exc_info=True)
         return {
             "error": str(exc),
             "type": "agent_runtime_stale",

@@ -1347,6 +1347,24 @@ function _restoreComposerDraftAfterFailedSend(draftText, filesSnapshot, sid, cle
   return restoredVisible;
 }
 
+// Wait for a self-healing WebUI server to come back (supervisor revive after a
+// stale-runtime exit). Polls /api/health with short timeouts until a fresh
+// process answers or the window closes. Returns true when revived.
+async function _awaitWebuiRevive(){
+  const deadline = Date.now() + 45000;
+  let lastAuth = false;
+  while(Date.now() < deadline){
+    try{
+      const res = await fetch('api/health', {credentials:'include'});
+      if(res.ok) return true;
+      lastAuth = (res.status === 401); // fresh process, auth survives cookie-wise
+      if(res.status === 401) return true;
+    }catch(_){ /* connection refused during restart — keep polling */ }
+    await new Promise(r => setTimeout(r, 1500));
+  }
+  if(typeof showToast==='function') showToast('WebUI-start misslyckades — ladda om sidan.', 6000, 'error');
+  return false;
+}
 async function send(){
   // Static guards expect _defaultMessageMode to stay near send() while the actual
   // read remains in the S.busy branch below.
@@ -1838,6 +1856,21 @@ async function send(){
       if($('msgInner')) $('msgInner').innerHTML='';
       if(typeof renderSessionList==='function') void renderSessionList();
       return;
+    }
+    // Typed stale-runtime response (agent checkout moved under the server):
+    // the server self-heals by exiting for its supervisor to revive it with
+    // the new revision. Wait for the fresh process, then retry the send ONCE
+    // so the user experiences a short hiccup instead of a hard error (#L2).
+    const runtimeStale = e && e.status === 409 && e.body
+      && /"type"\s*:\s*"agent_runtime_stale"/.test(String(e.body));
+    if(runtimeStale && !options._runtimeStaleRetried){
+      showToast('Agent uppdaterad — startar om WebUI, skickar igen…', 6000);
+      const revived = await _awaitWebuiRevive();
+      if(revived){
+        delete INFLIGHT[activeSid];
+        if(typeof clearInflightState==='function') clearInflightState(activeSid);
+        try{ return await send({...options, _runtimeStaleRetried:true}); }catch(_){ /* fall through to error handling */ }
+      }
     }
     const conflictActiveStream=/session already has an active stream/i.test(errMsg);
     if(conflictActiveStream){
