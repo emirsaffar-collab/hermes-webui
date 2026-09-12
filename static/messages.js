@@ -6432,11 +6432,17 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         // If the user watched the whole stream, _wasEverHidden stays false and
         // the notification is suppressed (matches Slack/Discord/Gmail/Claude).
         const _wasEverBackgrounded=_shouldForceCompletionNotification(activeSid, streamId);
-        const _completionPreview=_completionNotificationPreviewText(lastAsst,{
-          sessionId:completedSid,
-          liveDisplayText:typeof _streamDisplay==='function'?_streamDisplay():assistantText,
-        });
-        sendBrowserNotification('Response complete',_completionPreview||'Task finished',{forceHidden:_wasEverBackgrounded,sid:activeSid});
+        // Completion notifications are opt-in (notifications_complete_enabled,
+        // default off): with many parallel sessions a "Response complete" push
+        // per finished turn is spam. Approval/clarification notifications stay
+        // on the single notifications_enabled master switch.
+        if(window._notificationsCompleteEnabled===true){
+          const _completionPreview=_completionNotificationPreviewText(lastAsst,{
+            sessionId:completedSid,
+            liveDisplayText:typeof _streamDisplay==='function'?_streamDisplay():assistantText,
+          });
+          sendBrowserNotification('Response complete',_completionPreview||'Task finished',{forceHidden:_wasEverBackgrounded,sid:activeSid});
+        }
       };
       if(_shouldUseLiveProseFade()&&assistantBody){
         _cancelAnimationFramePendingStreamRender();

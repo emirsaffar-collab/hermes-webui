@@ -8769,6 +8769,8 @@ function _preferencesPayloadFromUi(){
   if(rtlCb) payload.rtl=rtlCb.checked;
   const notifCb=$('settingsNotificationsEnabled');
   if(notifCb) payload.notifications_enabled=notifCb.checked;
+  const notifCompleteCb=$('settingsNotificationsCompleteEnabled');
+  if(notifCompleteCb) payload.notifications_complete_enabled=notifCompleteCb.checked;
   const sidebarDensitySel=$('settingsSidebarDensity');
   if(sidebarDensitySel) payload.sidebar_density=sidebarDensitySel.value;
   const pinnedLimitField=$('settingsPinnedSessionsLimit');
@@ -9674,6 +9676,8 @@ async function loadSettingsPanel(){
     }
     const notifCb=$('settingsNotificationsEnabled');
     if(notifCb){notifCb.checked=!!settings.notifications_enabled;notifCb.addEventListener('change',_schedulePreferencesAutosave,{once:false});}
+    const notifCompleteCb=$('settingsNotificationsCompleteEnabled');
+    if(notifCompleteCb){notifCompleteCb.checked=!!settings.notifications_complete_enabled;notifCompleteCb.addEventListener('change',_schedulePreferencesAutosave,{once:false});}
     // show_thinking has no settings panel checkbox — controlled via /reasoning show|hide
     const sidebarDensitySel=$('settingsSidebarDensity');
     if(sidebarDensitySel){
@@ -12084,6 +12088,7 @@ function _applySavedSettingsUi(saved, body, opts){
   window._showPreviousMessagingSessions=!!body.show_previous_messaging_sessions;
   window._soundEnabled=body.sound_enabled;
   window._notificationsEnabled=body.notifications_enabled;
+  window._notificationsCompleteEnabled=!!body.notifications_complete_enabled;
   window._whatsNewSummaryEnabled=!!body.whats_new_summary_enabled;
   window._showThinking=body.show_thinking!==false;
   window._simplifiedToolCalling=true;

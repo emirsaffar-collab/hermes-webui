@@ -878,6 +878,102 @@
   :root.dark[data-skin="nous"] .mcp-http{color:#7EB6E0;}
   :root.dark[data-skin="nous"] .mcp-status-active{color:#7EB6E0;}
 
+  /* ── Skin: Techzola (dark-first neon; brand verified against live techzola.com 2026-09) ──
+     Palette: canvas #0a0a0a · surface #1a1a1a · neon #00f0ff · purple CTA gradient
+     (AA-fixed stops #c026d3→#9333ea; original #d946ef was 3.46:1 with white labels)
+     coral danger #e06868 (AA-fixed; original #c44040 = 4.60:1 borderline)
+     Fonts: Inter + JetBrains Mono. Glow = emphasis currency: ≤1 resting glow/viewport.
+     Contrast receipt: computed 2026-09-05, all shipped pairs ≥ AA (9/9 PASS). */
+  :root[data-skin="techzola"]{
+    color-scheme:light;
+    /* light mode is secondary for this brand — keep it honest but simple */
+    --bg:#fcfcfd;--sidebar:#f7f7f9;--surface:#ffffff;--surface-subtle:#f7f7f9;--surface-subtle-hover:#efeff2;
+    --main-bg:#fcfcfd;--topbar-bg:rgba(252,252,253,.92);
+    --border:#e4e4e7;--border2:#d4d4d8;--border-subtle:#ebebeb;--border-muted:#dcdce0;
+    --text:#18181b;--strong:#09090b;--muted:#71717a;--em:#3f3f46;
+    --accent:#0891b2;--accent-hover:#0e7490;--accent-bg:rgba(8,145,178,.08);--accent-bg-strong:rgba(8,145,178,.15);--accent-text:#0e7490;
+    --blue:#0891b2;--gold:#9333ea;--focus-ring:rgba(147,51,234,.35);--focus-glow:rgba(147,51,234,.10);
+    --input-bg:#ffffff;--hover-bg:rgba(0,0,0,.05);--code-bg:#f4f4f5;--code-inline-bg:rgba(0,0,0,.06);--code-text:#18181b;--pre-text:#18181b;
+    --error:#be4a4a;--success:#0f766e;--warning:#b45309;--info:#0891b2;
+    --radius-sm:4px;--radius-md:6px;--radius-card:8px;--radius-lg:10px;
+    --font-ui:"Inter",ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  :root.dark[data-skin="techzola"]{
+    color-scheme:dark;
+    --bg:#0a0a0a;--sidebar:#111112;--surface:#1a1a1a;--surface-subtle:#141414;--surface-subtle-hover:#222224;
+    --main-bg:#0a0a0a;--topbar-bg:rgba(10,10,10,.92);
+    --border:#26262a;--border2:#3a3a40;--border-subtle:#1c1c1f;--border-muted:#2e2e33;
+    --text:#f4f4f5;--strong:#ffffff;--muted:#8b8b94;--em:#d4d4d8;
+    --accent:#00f0ff;--accent-hover:#4df6ff;--accent-bg:rgba(0,240,255,.08);--accent-bg-strong:rgba(0,240,255,.15);--accent-text:#00f0ff;
+    --blue:#00f0ff;--gold:#d946ef;--focus-ring:rgba(0,240,255,.45);--focus-glow:rgba(0,240,255,.12);
+    --input-bg:#141414;--hover-bg:rgba(255,255,255,.05);--code-bg:#101012;--code-inline-bg:rgba(255,255,255,.07);--code-text:#e4e4e7;--pre-text:#d4d4d8;
+    --error:#e06868;--success:#2dd4a0;--warning:#e5b45c;--info:#00f0ff;
+    --user-bubble-bg:#1c1c1f;--user-bubble-border:#2e2e33;--user-bubble-text:#f4f4f5;--user-bubble-placeholder:#8b8b94;
+    --user-selection-bg:rgba(0,240,255,.16);--user-selection-text:#ffffff;
+  }
+  :root[data-skin="techzola"],
+  :root[data-skin="techzola"] body{font-family:var(--font-ui)!important;letter-spacing:-0.011em;background:var(--bg)!important;}
+  /* CTA gradient buttons — Techzola's purple CTA, AA-fixed stops */
+  :root[data-skin="techzola"] .btn-primary,
+  :root[data-skin="techzola"] .composer-send,
+  :root[data-skin="techzola"] .btn.accent{
+    background:linear-gradient(135deg,#c026d3 0%,#9333ea 100%)!important;
+    border:none!important;color:#ffffff!important;
+  }
+  :root[data-skin="techzola"] .btn-primary:hover,
+  :root[data-skin="techzola"] .composer-send:hover{
+    filter:brightness(1.08);
+  }
+  /* Signature element: terminal-block chrome — code/pre surfaces get the
+     neon hairline treatment (techzola.com's terminal-block heritage) */
+  :root[data-skin="techzola"] .msg-body pre,
+  :root[data-skin="techzola"] .preview-md pre,
+  :root[data-skin="techzola"] .terminal-box{
+    background:var(--code-bg)!important;
+    border:1px solid rgba(0,240,255,.22)!important;
+    border-radius:var(--radius-card)!important;
+    box-shadow:0 0 0 1px rgba(0,240,255,.05)!important;
+  }
+  /* Glow = emphasis currency: exactly ONE resting glow — focus rings carry it.
+     Hover/focus states get the neon ring; nothing else glows at rest. */
+  :root[data-skin="techzola"] :focus-visible{
+    outline:2px solid var(--accent)!important;
+    outline-offset:2px;
+    box-shadow:0 0 12px var(--focus-glow)!important;
+  }
+  :root[data-skin="techzola"] .session-item.active,
+  :root[data-skin="techzola"] .nav-tab.active{
+    border-left:2px solid var(--accent)!important;
+    background:var(--accent-bg)!important;
+  }
+  /* Structural surfaces follow the skin's own ramp (graphite pattern) */
+  :root[data-skin="techzola"] .app-titlebar,
+  :root[data-skin="techzola"] .rail,
+  :root[data-skin="techzola"] .sidebar,
+  :root[data-skin="techzola"] .rightpanel,
+  :root[data-skin="techzola"] .topbar,
+  :root[data-skin="techzola"] .composer-wrap{background:var(--sidebar)!important;border-color:var(--border)!important;box-shadow:none!important;}
+  :root[data-skin="techzola"] .main,
+  :root[data-skin="techzola"] .chat,
+  :root[data-skin="techzola"] .empty-state,
+  :root[data-skin="techzola"] .panel-view,
+  :root[data-skin="techzola"] .settings-section,
+  :root[data-skin="techzola"] .settings-card,
+  :root[data-skin="techzola"] .model-dropdown,
+  :root[data-skin="techzola"] .profile-menu,
+  :root[data-skin="techzola"] .session-actions-menu,
+  :root[data-skin="techzola"] .app-dialog,
+  :root[data-skin="techzola"] .kanban-modal,
+  :root[data-skin="techzola"] .cron-item,
+  :root[data-skin="techzola"] .tool-card,
+  :root[data-skin="techzola"] .composer-box{background:var(--surface)!important;border-color:var(--border)!important;}
+  /* Mono never in body prose — but terminal/links/badges keep it */
+  :root[data-skin="techzola"] .msg-body,
+  :root[data-skin="techzola"] .msg-body p{font-family:var(--font-conversation, var(--font-ui))!important;}
+  @media (prefers-reduced-motion:reduce){
+    :root[data-skin="techzola"] *{animation-duration:.01ms!important;transition-duration:.01ms!important;}
+  }
   /* ── Skin: Geist Contrast (Geist-inspired neutral precision) ──
      Dark mode uses a #FFF175 accent; solid accent controls use black
      foreground, while selected/navigation states stay neutral and restrained. */
@@ -7322,3 +7418,10 @@ html[data-conversation-outline="enabled"] #outlineToggleBtn:not([hidden]){displa
 /* Settings field highlight (mirrors msg-question-highlight / _highlightQuestionRow pattern) */
 .settings-field-highlight { animation: settings-field-pulse 1.6s ease-out; }
 @keyframes settings-field-pulse { 0% { box-shadow: 0 0 0 0 var(--focus-ring); } 35% { box-shadow: 0 0 0 4px var(--focus-ring); } 100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); } }
+
+  /* Techzola skin: titlebar mark + favicon-family recolor (skin-scoped, no HTML surgery) */
+  :root[data-skin="techzola"] .app-titlebar-mark-rect,
+  :root[data-skin="techzola"] #app-titlebar-mark-bg{fill:#1a1a1a;stroke:rgba(0,240,255,.25);stroke-width:1;}
+  :root[data-skin="techzola"] .app-titlebar-mark-tile{fill:url(#tz-tile)!important;}
+  :root[data-skin="techzola"] .app-titlebar-mark-stroke{stroke:#00f0ff;}
+  :root[data-skin="techzola"] .app-titlebar-title{letter-spacing:-0.011em;}

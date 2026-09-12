@@ -170,7 +170,10 @@ def test_stale_updated_at_with_running_state_reports_unknown(monkeypatch):
     """Older gateways may not refresh the file while still processing messages."""
     from api import agent_health
 
-    stale_ts = _iso(datetime.now(timezone.utc) - timedelta(seconds=300))
+    stale_ts = _iso(
+        datetime.now(timezone.utc)
+        - timedelta(seconds=agent_health.GATEWAY_FRESHNESS_THRESHOLD_S * 2.5)
+    )
 
     monkeypatch.setattr(
         agent_health,
@@ -302,7 +305,13 @@ def test_far_future_updated_at_is_rejected(monkeypatch):
     """A timestamp implausibly far in the future signals a broken clock."""
     from api import agent_health
 
-    far_future = _iso(datetime.now(timezone.utc) + timedelta(hours=1))
+    # "Far future" must exceed whatever freshness threshold the deployment
+    # uses (upstream 120s; local override may raise it, e.g. #32887), so build
+    # the probe relative to the module's own constant instead of hardcoding.
+    far_future = _iso(
+        datetime.now(timezone.utc)
+        + timedelta(seconds=agent_health.GATEWAY_FRESHNESS_THRESHOLD_S * 2)
+    )
     monkeypatch.setattr(
         agent_health,
         "_gateway_status_module",

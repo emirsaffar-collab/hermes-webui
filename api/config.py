@@ -9707,6 +9707,7 @@ _SETTINGS_DEFAULTS = {
     "sound_enabled": False,  # play notification sound when assistant finishes
     "rtl": False,  # right-to-left chat layout (chat messages + composer only)
     "notifications_enabled": False,  # browser notification when tab is in background
+    "notifications_complete_enabled": False,  # 'Response complete' pushes (opt-in; spam with many parallel sessions) — approvals/clarifications follow notifications_enabled
     "show_thinking": True,  # show/hide thinking/reasoning blocks in chat view
     "simplified_tool_calling": True,  # legacy compatibility; Worklog renderer remains enabled
     "terminal_auto_expand_on_output": False,  # auto-expand terminal panel when output arrives while collapsed
@@ -10003,6 +10004,7 @@ _SETTINGS_BOOL_KEYS = {
     "sound_enabled",
     "rtl",
     "notifications_enabled",
+    "notifications_complete_enabled",
     "show_thinking",
     "terminal_auto_expand_on_output",
     "workspace_todos_tab",

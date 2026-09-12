@@ -42,7 +42,10 @@ _GATEWAY_RUNTIME_STATUS_FILE = "gateway_state.json"
 # gateway restarts while still surfacing a true outage within a couple of
 # minutes. Override is intentionally not exposed: keep the check deterministic
 # and identical across deployments so support diagnostics are reproducible.
-GATEWAY_FRESHNESS_THRESHOLD_S: float = 120.0
+# Local override (2026-09-05): agent has no idle heartbeat (upstream
+# NousResearch/hermes-agent#32887), so 120s falsely flags a healthy
+# launchd gateway as stale. 86400s per upstream issue recommendation.
+GATEWAY_FRESHNESS_THRESHOLD_S: float = 86400.0
 
 
 def _checked_at() -> str:

@@ -2712,6 +2712,7 @@ const _SKINS=[
   {name:'Geist Contrast', value:'geist-contrast', colors:['#000000','#ffffff','#FFF175']},
   {name:'Zeus',     colors:['#FFD700','#FFBF00','#1A1A00']},
   {name:'Verdigris', value:'verdigris', colors:['#C89A5A','#0F1714','#22342C']},
+  {name:'Techzola', value:'techzola', colors:['#00f0ff','#c026d3','#0a0a0a']},
 ];
 const _VALID_THEMES=new Set((_THEMES||[]).map(t=>t.value));
 const _VALID_SKINS=new Set((_SKINS||[]).map(s=>(s.value||s.name).toLowerCase()));
@@ -2721,6 +2722,7 @@ const _LEGACY_THEME_MAP={
   monokai:{theme:'dark',skin:'sisyphus'},
   nord:{theme:'dark',skin:'slate'},
   oled:{theme:'dark',skin:'default'},
+  techzola:{theme:'dark',skin:'techzola'},
 };
 let _systemThemeMq=null;
 let _onSystemThemeChange=null;
@@ -3308,6 +3310,7 @@ window._mirrorSpeechSettingsFromServer=_mirrorSpeechSettingsFromServer;
     window._showPreviousMessagingSessions=!!s.show_previous_messaging_sessions;
     window._soundEnabled=!!s.sound_enabled;
     window._notificationsEnabled=!!s.notifications_enabled;
+    window._notificationsCompleteEnabled=!!s.notifications_complete_enabled;
     window._whatsNewSummaryEnabled=!!s.whats_new_summary_enabled;
     window._showThinking=s.show_thinking!==false;
     window._simplifiedToolCalling=true;
