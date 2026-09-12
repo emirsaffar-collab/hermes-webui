@@ -297,7 +297,12 @@ def test_run_agent_streaming_installs_and_resets_profile_home_override(tmp_path,
     monkeypatch.setattr(_config_mod, "get_config_for_profile_home", lambda profile_home: {})
     _fake_mcp_module = types.ModuleType("tools.mcp_tool")
     _fake_mcp_module.discover_mcp_tools = _discover_mcp_tools
+    # streaming.py imports discover_mcp_tools from tools.mcp_tool_discovery
+    # (post Sep-2026 decomposition); fake that path too.
+    _fake_mcp_discovery = types.ModuleType("tools.mcp_tool_discovery")
+    _fake_mcp_discovery.discover_mcp_tools = _discover_mcp_tools
     monkeypatch.setitem(sys.modules, "tools.mcp_tool", _fake_mcp_module)
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_discovery", _fake_mcp_discovery)
 
     monkeypatch.setattr(profiles_api, "get_hermes_home_for_profile", lambda name: _home)
     monkeypatch.setattr(profiles_api, "get_profile_runtime_env", lambda home: {})
@@ -482,7 +487,12 @@ def test_run_agent_streaming_falls_back_to_skill_module_patch_for_static_modules
 
     _fake_mcp_module = types.ModuleType("tools.mcp_tool")
     _fake_mcp_module.discover_mcp_tools = _discover_mcp_tools
+    # streaming.py imports discover_mcp_tools from tools.mcp_tool_discovery
+    # (post Sep-2026 decomposition); fake that path too.
+    _fake_mcp_discovery = types.ModuleType("tools.mcp_tool_discovery")
+    _fake_mcp_discovery.discover_mcp_tools = _discover_mcp_tools
     monkeypatch.setitem(sys.modules, "tools.mcp_tool", _fake_mcp_module)
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_discovery", _fake_mcp_discovery)
 
     import api.config as _config_mod
     monkeypatch.setattr(_config_mod, "_resolve_cli_toolsets", lambda cfg: [])

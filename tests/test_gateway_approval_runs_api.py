@@ -922,6 +922,9 @@ def test_gateway_approval_relay_does_not_unblock_unrelated_local_head():
         "tools.approval",
         reason="tools.approval not available in this environment",
     )
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
+
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
 
     sid = "sess-remote-relay-local-head"
     stream_id = "sid-remote-relay-local-head"
@@ -932,7 +935,7 @@ def test_gateway_approval_relay_does_not_unblock_unrelated_local_head():
         approvals.submit_gateway_pending_mirror(sid, {
             "run_id": "run-remote", "approval_id": "remote-a", "command": "remote"
         })
-        local_entry = ta._ApprovalEntry({
+        local_entry = _AGW._ApprovalEntry({
             "command": "local",
             "description": "local approval",
             "approval_id": "local-b",
@@ -1141,12 +1144,13 @@ def test_legacy_gateway_approval_without_run_yields_to_live_local_gateway_head()
         "tools.approval",
         reason="tools.approval not available in this environment",
     )
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
 
     sid = "sess-legacy-no-run-local-gateway-head"
     approvals._pending.pop(sid, None)
     approvals._gateway_queues.pop(sid, None)
     try:
-        entry = ta._ApprovalEntry({
+        entry = _AGW._ApprovalEntry({
             "approval_id": "local-id",
             "command": "local-head",
         })
@@ -2578,6 +2582,7 @@ def test_stale_same_run_gateway_card_without_token_does_not_relay_live_head():
         "tools.approval",
         reason="tools.approval not available in this environment",
     )
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
 
     sid = "sess-stale-same-run-no-token"
     stream_id = "sid-stale-same-run-no-token"
@@ -2591,7 +2596,7 @@ def test_stale_same_run_gateway_card_without_token_does_not_relay_live_head():
             "approval_id": "stale-a",
             "command": "stale",
         }]
-        approvals._gateway_queues[sid] = [ta._ApprovalEntry({
+        approvals._gateway_queues[sid] = [_AGW._ApprovalEntry({
             "run_id": "run-shared",
             "approval_id": "live-b",
             "command": "live",
@@ -2630,6 +2635,7 @@ def test_stale_same_run_gateway_card_without_token_after_teardown_does_not_relay
         "tools.approval",
         reason="tools.approval not available in this environment",
     )
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
 
     sid = "sess-stale-same-run-no-token-teardown"
     approvals._pending.pop(sid, None)
@@ -2641,7 +2647,7 @@ def test_stale_same_run_gateway_card_without_token_after_teardown_does_not_relay
             "approval_id": "stale-a",
             "command": "stale",
         }]
-        approvals._gateway_queues[sid] = [ta._ApprovalEntry({
+        approvals._gateway_queues[sid] = [_AGW._ApprovalEntry({
             "run_id": "run-shared",
             "approval_id": "live-b",
             "command": "live",
@@ -2680,6 +2686,7 @@ def test_stale_same_run_gateway_card_without_token_does_not_relay_live_head_when
         "tools.approval",
         reason="tools.approval not available in this environment",
     )
+    _AGW = pytest.importorskip("tools.approval_gateway_wait")
 
     sid = "sess-stale-same-run-no-token-synthesized-live-id"
     stream_id = "sid-stale-same-run-no-token-synthesized-live-id"
@@ -2693,7 +2700,7 @@ def test_stale_same_run_gateway_card_without_token_does_not_relay_live_head_when
             "approval_id": "stale-a",
             "command": "stale",
         }]
-        approvals._gateway_queues[sid] = [ta._ApprovalEntry({
+        approvals._gateway_queues[sid] = [_AGW._ApprovalEntry({
             "run_id": "run-shared",
             "command": "live",
         })]

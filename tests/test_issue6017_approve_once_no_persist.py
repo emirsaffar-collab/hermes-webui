@@ -26,6 +26,7 @@ from __future__ import annotations
 import importlib
 import uuid
 
+import tools.approval_gateway_wait as _AGW  # noqa: F401  (post-decomposition home of _ApprovalEntry)
 from tests.conftest import requires_agent_modules
 
 pytestmark = requires_agent_modules
@@ -37,7 +38,7 @@ def _seed_gateway_entry(ta, sid, pattern_key):
     Mirrors the local in-process agent path: a guarded command blocks on an
     ``_ApprovalEntry`` in ``_gateway_queues`` waiting for the user's choice.
     """
-    entry = ta._ApprovalEntry({
+    entry = _AGW._ApprovalEntry({
         "command": "rm -rf /tmp/6017",
         "pattern_key": pattern_key,
         "pattern_keys": [pattern_key],

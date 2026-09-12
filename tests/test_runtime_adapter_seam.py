@@ -364,6 +364,7 @@ def test_approval_respond_approves_from_gateway_queues_when_pending_empty() -> N
 
     routes = importlib.import_module("api.routes")
     approval_mod = importlib.import_module("tools.approval")
+    approval_entry_mod = importlib.import_module("tools.approval_gateway_wait")
 
     test_sid = "__test_gateway_approval_sid__"
     test_key = "__test_pattern_key__"
@@ -373,7 +374,7 @@ def test_approval_respond_approves_from_gateway_queues_when_pending_empty() -> N
         approval_mod._pending.pop(test_sid, None)
 
     # 2. Populate _gateway_queues with a real entry
-    entry = approval_mod._ApprovalEntry({
+    entry = approval_entry_mod._ApprovalEntry({
         "command": "test_cmd",
         "pattern_key": test_key,
         "pattern_keys": [test_key],

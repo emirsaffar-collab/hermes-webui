@@ -44,6 +44,7 @@ from api.gateway_chat import _STREAM_RUN_IDS
 
 try:
     import tools.approval as ta
+    import tools.approval_gateway_wait as tagw
     from api import route_approvals as ra
     APPROVAL_AVAILABLE = True
 except ImportError:
@@ -109,7 +110,7 @@ def _seed_local_pending_approval(sid: str):
     with ta._lock:
         ta._gateway_queues.pop(sid, None)
         ta._pending.pop(sid, None)
-    entry = ta._ApprovalEntry({
+    entry = tagw._ApprovalEntry({
         "command": "rm -rf /tmp/x",
         "description": "Dangerous command",
         "pattern_key": "dangerous_command",

@@ -18,12 +18,24 @@ def _install_fake_mcp_tool(monkeypatch, shutdown, discover, servers=None, lock=N
     tools_pkg = ModuleType("tools")
     tools_pkg.__path__ = []
     mcp_tool = ModuleType("tools.mcp_tool")
-    mcp_tool.shutdown_mcp_servers = shutdown
-    mcp_tool.discover_mcp_tools = discover
     mcp_tool._servers = servers if servers is not None else {}
     mcp_tool._lock = lock if lock is not None else threading.Lock()
+    # api.commands now imports each symbol from its post-decomposition module
+    # (tools.mcp_tool_lifecycle / tools.mcp_tool_discovery); the fake for each
+    # shares the same _servers/_lock state through tools.mcp_tool_common.
+    common = ModuleType("tools.mcp_tool_common")
+    def _getattr(name):
+        return getattr(mcp_tool, name)
+    common.__getattr__ = _getattr
+    lifecycle = ModuleType("tools.mcp_tool_lifecycle")
+    lifecycle.shutdown_mcp_servers = shutdown
+    discovery = ModuleType("tools.mcp_tool_discovery")
+    discovery.discover_mcp_tools = discover
     monkeypatch.setitem(sys.modules, "tools", tools_pkg)
     monkeypatch.setitem(sys.modules, "tools.mcp_tool", mcp_tool)
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_common", common)
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_lifecycle", lifecycle)
+    monkeypatch.setitem(sys.modules, "tools.mcp_tool_discovery", discovery)
     return mcp_tool
 
 

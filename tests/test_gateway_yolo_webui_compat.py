@@ -113,7 +113,7 @@ def test_approval_card_yolo_marks_skip_all_busy_while_request_is_pending():
 @pytest.mark.skipif(not APPROVAL_AVAILABLE, reason="tools.approval unavailable")
 def test_card_yolo_drains_all_already_parked_local_approvals(monkeypatch):
     from api import routes
-    from tools.approval import _ApprovalEntry
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     sid = "webui-card-yolo-drain-local"
     approvals = [
@@ -166,7 +166,7 @@ def test_card_yolo_drains_all_already_parked_local_approvals(monkeypatch):
 @pytest.mark.skipif(not APPROVAL_AVAILABLE, reason="tools.approval unavailable")
 def test_card_yolo_drains_all_run_backed_and_local_approvals(monkeypatch):
     from api import route_approvals, routes
-    from tools.approval import _ApprovalEntry
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     sid = "webui-card-yolo-drain-mixed"
     run_approvals = [
@@ -256,7 +256,7 @@ def test_card_yolo_drains_all_run_backed_and_local_approvals(monkeypatch):
 @pytest.mark.parametrize("enable_yolo", [False, True])
 def test_stale_card_run_owner_cannot_rebind_to_current_run(monkeypatch, enable_yolo):
     from api import route_approvals, routes
-    from tools.approval import _ApprovalEntry
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     sid = "webui-card-stale-run-owner"
     stream_id = "stream-current-owner"
@@ -1218,7 +1218,7 @@ def test_yolo_post_serializes_post_snapshot_gateway_approval(monkeypatch):
 @pytest.mark.skipif(not APPROVAL_AVAILABLE, reason="tools.approval unavailable")
 def test_yolo_drain_serializes_post_drain_local_approval(monkeypatch):
     from api import route_approvals, routes
-    from tools.approval import _ApprovalEntry
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     sid = "webui-yolo-post-drain-local-handoff"
     response = {}
@@ -1397,7 +1397,7 @@ def test_yolo_disable_linearizes_after_selected_gateway_autoapproval(monkeypatch
 @pytest.mark.skipif(not APPROVAL_AVAILABLE, reason="tools.approval unavailable")
 def test_disable_that_wins_handoff_precedes_enable_drain(monkeypatch):
     from api import routes
-    from tools.approval import _ApprovalEntry
+    from tools.approval_gateway_wait import _ApprovalEntry
 
     sid = "webui-yolo-disable-before-enable-handoff"
     handoff_lock = threading.Lock()
