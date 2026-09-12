@@ -223,8 +223,20 @@ def sync_session_title(session_id: str, title: str, profile: Optional[str] = Non
     try:
         # Ensure the session row exists (idempotent) so the UPDATE has a target.
         db.ensure_session(session_id=session_id, source='webui')
+
+        def _set_auto_title(target, value):
+            # Newer hermes_state (post 2026-09 compat cleanup) replaced
+            # ``set_auto_title_if_empty`` with provenance-aware ``set_auto_title``;
+            # fall back to the legacy name against older stores. Both only fill a
+            # NULL title / lose to a higher-authority title, so a manual rename
+            # is never clobbered either way.
+            set_auto = getattr(db, "set_auto_title", None)
+            if set_auto is not None:
+                return set_auto(target, value, source=db.TITLE_SOURCE_LLM)
+            return db.set_auto_title_if_empty(target, value)
+
         try:
-            db.set_auto_title_if_empty(session_id, title)
+            _set_auto_title(session_id, title)
         except ValueError:
             # state.db enforces uniqueness on sessions.title, so a byte-identical
             # auto-title generated for two sessions raises ValueError here. Derive
@@ -232,7 +244,7 @@ def sync_session_title(session_id: str, title: str, profile: Optional[str] = Non
             # retry instead of leaving the second row blank (#6964).
             alt = db.get_next_title_in_lineage(title)
             if alt and alt != title:
-                db.set_auto_title_if_empty(session_id, alt)
+                _set_auto_title(session_id, alt)
     except Exception:
         logger.debug("Failed to sync session title to state.db for %s", session_id)
     finally:
