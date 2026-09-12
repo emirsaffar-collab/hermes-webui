@@ -24711,9 +24711,14 @@ def _handle_cron_create(handler, body):
 def _handle_cron_delivery_options(handler):
     """Return available delivery platforms for cron jobs."""
     try:
-        from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
+        # Post Sep-2026 decomposition the set lives in cron.scheduler_delivery;
+        # fall back to the old cron.scheduler location for older agents.
+        from cron.scheduler_delivery import _KNOWN_DELIVERY_PLATFORMS
     except Exception:
-        _KNOWN_DELIVERY_PLATFORMS = frozenset()
+        try:
+            from cron.scheduler import _KNOWN_DELIVERY_PLATFORMS
+        except Exception:
+            _KNOWN_DELIVERY_PLATFORMS = frozenset()
     platforms = [
         {"value": "local", "label": "Local (save output only)"},
         {"value": "origin", "label": "Origin (reply to creator)"}
@@ -28552,7 +28557,7 @@ def _mcp_runtime_status_by_name() -> dict[str, dict]:
     is unavailable, fall back to an empty map so the API remains safe.
     """
     try:
-        from tools.mcp_tool import get_mcp_status
+        from tools.mcp_tool_discovery import get_mcp_status
         statuses = get_mcp_status()
     except Exception:
         return {}

@@ -2818,7 +2818,7 @@ def _reset_turn_session_identity(tokens) -> None:
     tok = tokens.get("approval")
     if tok is not None:
         try:
-            from tools.approval import reset_current_session_key
+            from tools.approval_context import reset_current_session_key
             reset_current_session_key(tok)
         except Exception:
             logger.debug("per-turn approval session-key reset failed", exc_info=True)
