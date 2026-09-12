@@ -241,6 +241,13 @@ def _atomic_write_text(path: Path, text: str, *, encoding: str = "utf-8") -> Non
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
+            # Re-apply the preserved mode AFTER the write (inside the with, fd
+            # still open): macOS/APFS clears the setgid bit on write() to a
+            # regular file, so a single pre-write fchmod silently drops an
+            # administrator's setgid policy on shared configs. (Linux keeps
+            # the bit; the re-chmod is a no-op there.)
+            if mode is not None and hasattr(os, "fchmod"):
+                os.fchmod(f.fileno(), mode)
         _verify_symlink_target()
         os.replace(tmp, write_path)
         _fsync_directory(write_path.parent)
