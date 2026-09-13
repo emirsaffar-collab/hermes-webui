@@ -76,6 +76,17 @@ class ExtensionSidecarProxyError(Exception):
 
 EXTENSION_ROUTE_PREFIX = "/extensions/"
 _EXTENSION_DIR_ENV = "HERMES_WEBUI_EXTENSION_DIR"
+
+# Server-side loopback sidecar health probe (device-independent badge source).
+# The browser-side direct probe in panels.js cannot reach 127.0.0.1 from a phone
+# (loopback = the phone itself) and Safari blocks loopback fetches from https
+# pages as mixed content — so the panel now treats this server-side snapshot as
+# the primary health source and only falls back to the direct probe when the
+# server has not provided one (pre-restart back-compat).
+_SIDECAR_HEALTH_TIMEOUT_S = 2.5
+_SIDECAR_HEALTH_TTL_S = 15.0
+_SIDECAR_HEALTH_CACHE: Dict[str, Any] = {}
+_SIDECAR_HEALTH_LOCK = threading.Lock()
 _EXTENSION_SCRIPT_URLS_ENV = "HERMES_WEBUI_EXTENSION_SCRIPT_URLS"
 _EXTENSION_STYLESHEET_URLS_ENV = "HERMES_WEBUI_EXTENSION_STYLESHEET_URLS"
 _EXTENSION_MANIFEST_ENV = "HERMES_WEBUI_EXTENSION_MANIFEST"
@@ -1208,6 +1219,67 @@ def _sidecar_proxy_public_status(
     return payload
 
 
+def _probe_sidecar_health_sidecars(sidecars: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Probe each loopback sidecar's health URL from the WebUI server process.
+
+    Returns {ext_id: {"status": "healthy"|"unreachable", "detail": str}} with a
+    short TTL cache so the ~30s panel re-poll does not re-dial every sidecar on
+    each status request. Only origins that re-normalize to safe loopback hosts
+    are dialed (the manifest record was normalized on ingest, but re-check here
+    so this function is safe against any future caller passing raw input).
+    Probing failures are reported, never raised — a status endpoint must not
+    fail because a sidecar is down.
+    """
+    now = time.monotonic()
+    result: Dict[str, Dict[str, Any]] = {}
+    with _SIDECAR_HEALTH_LOCK:
+        expired = [k for k, v in _SIDECAR_HEALTH_CACHE.items() if now - v["probed_at"] > _SIDECAR_HEALTH_TTL_S]
+        for key in expired:
+            _SIDECAR_HEALTH_CACHE.pop(key, None)
+    for sidecar in sidecars or []:
+        ext_id = sidecar.get("id") if isinstance(sidecar, dict) else None
+        health_url = sidecar.get("health_url") if isinstance(sidecar, dict) else None
+        if not ext_id or not isinstance(health_url, str):
+            continue
+        origin = _normalize_loopback_sidecar_origin(sidecar.get("origin"))
+        if origin is None or not health_url.startswith(origin):
+            # Not a safe loopback target (or the record is malformed); the panel
+            # renders "misconfigured" for records without a usable health URL.
+            result[ext_id] = {"status": "misconfigured", "detail": "unsafe or missing loopback origin"}
+            continue
+        with _SIDECAR_HEALTH_LOCK:
+            cached = _SIDECAR_HEALTH_CACHE.get(health_url)
+        if cached and now - cached["probed_at"] <= _SIDECAR_HEALTH_TTL_S:
+            result[ext_id] = {k: v for k, v in cached.items() if k != "probed_at"}
+            continue
+        status, detail = "unreachable", "probe failed"
+        try:
+            parsed = urlsplit(health_url)
+            conn_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+            host = parsed.hostname or "127.0.0.1"
+            port = parsed.port or (443 if parsed.scheme == "https" else 80)
+            conn = conn_cls(host, port, timeout=_SIDECAR_HEALTH_TIMEOUT_S)
+            try:
+                conn.request("GET", parsed.path or "/health")
+                resp = conn.getresponse()
+                body = resp.read(4096)
+                if 200 <= resp.status < 300:
+                    status, detail = "healthy", "ok"
+                else:
+                    status, detail = "unhealthy", f"HTTP {resp.status}"
+            finally:
+                conn.close()
+        except OSError as exc:
+            detail = f"{type(exc).__name__}: connection failed" if isinstance(exc, (ConnectionRefusedError, socket.timeout, OSError)) else "connection failed"
+        except Exception:
+            detail = "connection failed"
+        entry = {"status": status, "detail": detail, "probed_at": now}
+        with _SIDECAR_HEALTH_LOCK:
+            _SIDECAR_HEALTH_CACHE[health_url] = entry
+        result[ext_id] = {k: v for k, v in entry.items() if k != "probed_at"}
+    return result
+
+
 def _extension_sidecar_records(
     manifest: object,
     disabled_ids: Optional[Set[str]] = None,
@@ -1506,6 +1578,7 @@ def get_extension_status() -> Dict[str, Any]:
         "script_urls": script_urls,
         "stylesheet_urls": stylesheet_urls,
         "sidecars": sidecars,
+        "sidecar_health": _probe_sidecar_health_sidecars(sidecars),
         "counts": {
             "script_urls": len(script_urls),
             "stylesheet_urls": len(stylesheet_urls),

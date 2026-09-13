@@ -10087,12 +10087,34 @@ function _setExtensionSidecarRuntime(index,runtime){
   el.innerHTML=details;
 }
 
-async function _checkExtensionSidecarHealth(sidecar,index,seq){
+async function _checkExtensionSidecarHealth(sidecar,index,seq,serverHealth){
   const healthUrl=sidecar&&sidecar.health_url;
   if(!healthUrl){
-    _setExtensionSidecarHealth(index,'blocked','unreachable / blocked');
+    _setExtensionSidecarHealth(index,'blocked','misconfigured');
     _setExtensionSidecarRuntime(index,null);
     return;
+  }
+  // Primary source: the server-side probe embedded in /api/extensions/status.
+  // It is device-independent (the WebUI server dials loopback itself), so the
+  // badge is correct on phones and Safari where a direct fetch to 127.0.0.1
+  // can never succeed. Fall back to the direct browser probe only when the
+  // server snapshot is absent (pre-restart back-compat).
+  if(serverHealth&&typeof serverHealth==='object'){
+    const entry=serverHealth[sidecar.id];
+    if(entry&&typeof entry==='object'&&typeof entry.status==='string'){
+      if(seq!==_extensionsSidecarMonitorSeq) return;
+      if(entry.status==='healthy'){
+        _setExtensionSidecarHealth(index,'healthy','healthy (server)');
+      }else if(entry.status==='unhealthy'){
+        _setExtensionSidecarHealth(index,'unhealthy','unhealthy (server)');
+      }else if(entry.status==='misconfigured'){
+        _setExtensionSidecarHealth(index,'blocked','misconfigured');
+      }else{
+        _setExtensionSidecarHealth(index,'blocked','unreachable / blocked (server)');
+      }
+      _setExtensionSidecarRuntime(index,null);
+      return;
+    }
   }
   let controller=null;
   let timeoutId=null;
@@ -10124,9 +10146,9 @@ async function _checkExtensionSidecarHealth(sidecar,index,seq){
   }
 }
 
-function _monitorExtensionSidecars(sidecars,seq){
+function _monitorExtensionSidecars(sidecars,seq,serverHealth){
   if(!Array.isArray(sidecars)||sidecars.length===0) return;
-  sidecars.forEach((sidecar,index)=>_checkExtensionSidecarHealth(sidecar,index,seq));
+  sidecars.forEach((sidecar,index)=>_checkExtensionSidecarHealth(sidecar,index,seq,serverHealth));
 }
 
 function _renderExtensionsPanel(data,seq){
@@ -10218,7 +10240,21 @@ function _renderExtensionsPanel(data,seq){
   _bindExtensionToggleButtons(target);
   _bindExtensionSidecarProxyButtons(target);
   _bindExtensionSettingsButtons(target);
-  _monitorExtensionSidecars(sidecars,seq);
+  _monitorExtensionSidecars(sidecars,seq,(data&&typeof data.sidecar_health==='object')?data.sidecar_health:null);
+  // Re-poll while the sidecar card stays visible so a transient failure does
+  // not stick until the next manual re-render (single-shot was the old behavior).
+  if(window._extensionsSidecarHealthTimer) clearTimeout(window._extensionsSidecarHealthTimer);
+  window._extensionsSidecarHealthTimer=setTimeout(async()=>{
+    try{
+      const fresh=await api('/api/extensions/status');
+      if(seq===_extensionsSidecarMonitorSeq&&document.querySelector('[data-sidecar-health-index]')){
+        _monitorExtensionSidecars(fresh&&fresh.sidecars,seq,(fresh&&typeof fresh.sidecar_health==='object')?fresh.sidecar_health:null);
+        if(document.querySelector('[data-sidecar-health-index]')){
+          setTimeout(()=>loadExtensionsPanel({preserveExisting:true}),30000);
+        }
+      }
+    }catch(_e){}
+  },30000);
 }
 
 function _bindExtensionConfigureButtons(root){
