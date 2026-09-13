@@ -196,9 +196,9 @@ def test_extensions_panel_renders_loopback_sidecar_monitor_safely():
     assert "data-extension-sidecar-proxy-approved" in sidecar_block
     assert 'data-sidecar-runtime-index="${index}"' in sidecar_block
     assert "fetch(healthUrl,{credentials:'omit',cache:'no-store'" in monitor_block
-    assert "function _monitorExtensionSidecars(sidecars,seq)" in monitor_block
+    assert "function _monitorExtensionSidecars(sidecars,seq,serverHealth)" in monitor_block
     assert "const seq=_extensionsSidecarMonitorSeq" not in monitor_block
-    assert "_monitorExtensionSidecars(sidecars,seq)" in render_block
+    assert "_monitorExtensionSidecars(sidecars,seq," in render_block
     assert "function _renderExtensionsPanel(data,seq)" in render_block
     assert "_bindExtensionSidecarProxyButtons(target)" in render_block
     assert "const seq=++_extensionsSidecarMonitorSeq" in load_block
