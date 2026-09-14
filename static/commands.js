@@ -29,6 +29,7 @@ const COMMANDS=[
   {name:'btw',       desc:t('cmd_btw'),      fn:cmdBtw,       arg:'question', noEcho:true},
   {name:'background',desc:t('cmd_background'),fn:cmdBackground,arg:'prompt',  noEcho:true},
   {name:'status',    desc:t('cmd_status'),   fn:cmdStatus},
+  {name:'fleet',     desc:'Fleet-status: whole-setup health at a glance', fn:cmdFleet},
   {name:'voice',     desc:t('cmd_voice'),    fn:cmdVoice,     noEcho:true},
   {name:'reasoning', desc:t('cmd_reasoning'), fn:cmdReasoning, arg:'show|hide|none|minimal|low|medium|high|xhigh|max', subArgs:['show','hide','none','minimal','low','medium','high','xhigh','max'], noEcho:true},
   {name:'yolo', desc:t('cmd_yolo'), fn:cmdYolo, noEcho:true},
@@ -1863,6 +1864,43 @@ function cmdStatus(){
     content:'',
     _ephemeral:true,
     _statusCard:_statusCardFromSession(S.session),
+    _ts:Date.now()/1000,
+  });
+  renderMessages();
+}
+// /fleet — one-glance health of the whole setup (Emir's setup, 2026-09-14):
+// server runtime state + active runs + agent gateway, rendered as a local
+// message card. Data sources: public /health (no auth) + /api/system/health.
+async function cmdFleet(){
+  let health=null, system=null;
+  try{ const r=await fetch('/health',{credentials:'include'}); if(r.ok) health=await r.json(); }catch(_){/* server down = the answer */}
+  try{ system=await api('/api/system/health',{timeoutToast:false}); }catch(_){/* auth wall or down */}
+  const lines=[];
+  if(health){
+    const st=health.status==='ok'?'✅':'⚠️';
+    lines.push(`${st} WebUI: ${health.status} · uptime ${Math.round((health.uptime_seconds||0)/60)} min · ${health.sessions??'?'} sessions`);
+    lines.push(`🟢 Active: ${health.active_runs??0} runs / ${health.active_streams??0} streams`);
+  } else {
+    lines.push('❌ WebUI /health: unreachable');
+  }
+  if(system&&system.metrics){
+    const m=system.metrics;
+    const cpu=m.cpu?`${m.cpu.percent}% CPU`:'CPU n/a';
+    const mem=m.memory?`${m.memory.percent}% mem`:'mem n/a';
+    const disk=m.disk?`${m.disk.percent}% disk`:'disk n/a';
+    lines.push(`🖥 ${cpu} · ${mem} · ${disk}`);
+  }
+  if(health&&Array.isArray(health.runs)&&health.runs.length){
+    const oldest=Math.max(...health.runs.map(r=>r.age_seconds||0));
+    lines.push(`⏱ oldest run: ${Math.round(oldest)}s · models: ${[...new Set(health.runs.map(r=>r.model))].join(', ')}`);
+  }
+  if(!lines.length) lines.push('❌ Fleet-status unavailable');
+  if(!S.session){await newSession();await renderSessionList();}
+  S.messages.push({role:'user',content:'/fleet',_ts:Date.now()/1000});
+  S.messages.push({
+    role:'assistant',
+    content:`**Fleet-status** (${new Date().toLocaleTimeString()})\n\n${lines.join('\n')}`,
+    _ephemeral:true,
     _ts:Date.now()/1000,
   });
   renderMessages();
