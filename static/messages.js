@@ -1348,14 +1348,17 @@ function _restoreComposerDraftAfterFailedSend(draftText, filesSnapshot, sid, cle
 }
 
 // Wait for a self-healing WebUI server to come back (supervisor revive after a
-// stale-runtime exit). Polls /api/health with short timeouts until a fresh
-// process answers or the window closes. Returns true when revived.
+// stale-runtime exit). Polls the public /health liveness route with short
+// timeouts until a fresh process answers or the window closes. Returns true
+// when revived. (Previously polled /api/health, which has no route — the 404
+// was never "ok", so a healthy-but-stale process kept the poller spinning
+// the full 45 s and the send died even though the server was back.)
 async function _awaitWebuiRevive(){
   const deadline = Date.now() + 45000;
   let lastAuth = false;
   while(Date.now() < deadline){
     try{
-      const res = await fetch('api/health', {credentials:'include'});
+      const res = await fetch('/health', {credentials:'include'});
       if(res.ok) return true;
       lastAuth = (res.status === 401); // fresh process, auth survives cookie-wise
       if(res.status === 401) return true;
