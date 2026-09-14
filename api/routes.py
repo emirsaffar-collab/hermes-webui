@@ -237,6 +237,22 @@ def _on_session_list_changed(profile: str | None = None) -> None:
     # streaming TTL is the backstop — they surface within one streaming-TTL
     # window (≤30s) rather than instantly. That bound is the deliberate
     # latency/CPU trade-off of the freeze.
+    # Debounce (2026-09-14): fleet bursts (parallel subagent spawns + session
+    # creates) fire this listener many times within a few seconds; each clear
+    # forced a full 690k-message CLI-projection rebuild (1-9s) on the next poll,
+    # spiking >10% of /api/sessions requests past 1s during fleet activity
+    # (06Z-16Z log: 315 spikes; 92% of requests otherwise <250ms). Coalescing
+    # burst clears into one rebuild per window keeps a single mutation as
+    # fresh as before (immediate clear) while capping the rebuild rate. The
+    # non-streaming TTL (5s) already bounds staleness for anything the
+    # debounce window coalesces away.
+    import time as _time
+    global _SESSION_LIST_CHANGED_LAST_CLEAR
+    now = _time.monotonic()
+    with _SESSION_LIST_CHANGED_LOCK:
+        if _SESSION_LIST_CHANGED_LAST_CLEAR is not None and (now - _SESSION_LIST_CHANGED_LAST_CLEAR) < _SESSION_LIST_CHANGED_DEBOUNCE_SECONDS:
+            return
+        _SESSION_LIST_CHANGED_LAST_CLEAR = now
     try:
         from api.models import clear_cli_sessions_cache
         clear_cli_sessions_cache()
@@ -1939,6 +1955,12 @@ _SESSIONS_CACHE_STREAMING_TTL_SECONDS = (
 _SESSIONS_CACHE_TTL_SECONDS = _route_session_list_cache._SESSIONS_CACHE_TTL_SECONDS
 _SESSIONS_CACHE_WAIT_SECONDS = _route_session_list_cache._SESSIONS_CACHE_WAIT_SECONDS
 _clear_session_list_cache = _route_session_list_cache._clear_session_list_cache
+# Debounce state for _on_session_list_changed (2026-09-14): fleet bursts fire
+# the listener many times per second; coalesce into one CLI-projection clear
+# per window (see _on_session_list_changed docstring for the latency evidence).
+_SESSION_LIST_CHANGED_DEBOUNCE_SECONDS = 3.0
+_SESSION_LIST_CHANGED_LAST_CLEAR = None
+_SESSION_LIST_CHANGED_LOCK = threading.Lock()
 _session_list_cache_clear = _route_session_list_cache._session_list_cache_clear
 _session_list_cache_claim_rebuild = _route_session_list_cache._session_list_cache_claim_rebuild
 _session_list_cache_done = _route_session_list_cache._session_list_cache_done
