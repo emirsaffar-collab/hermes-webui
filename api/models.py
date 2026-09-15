@@ -7203,6 +7203,79 @@ def _load_and_cache_cli_sessions(
     return _copy_cli_sessions(sessions)
 
 
+_CLI_SESSIONS_BG_REFRESH_THREADS: dict[tuple, threading.Thread] = {}
+_CLI_SESSIONS_BG_REFRESH_MAX_AGE_S = 30.0
+
+
+def _serve_stale_and_revalidate_cli(
+    *,
+    cache_key: tuple,
+    ttl: float,
+    load_sessions,
+    stale_stamp: int,
+    all_profiles: bool,
+    db_path,
+) -> bool:
+    """Serve the stale entry now and refresh it in a background thread.
+
+    Returns True when the caller may serve its ``stale_sessions`` immediately.
+    Debounced: one refresh thread per cache key; a thread younger than
+    ``_CLI_SESSIONS_BG_REFRESH_MAX_AGE_S`` means a refresh is already in flight
+    and the stale entry is simply served again. False only when a background
+    refresh could not be scheduled (caller falls back to the synchronous path).
+    """
+    now = time.monotonic()
+    with _CLI_SESSIONS_CACHE_LOCK:
+        existing = _CLI_SESSIONS_BG_REFRESH_THREADS.get(cache_key)
+        if existing is not None:
+            if existing.is_alive():
+                return True  # refresh already running; keep serving stale
+            # A dead thread record is stale bookkeeping — replace it below.
+            _CLI_SESSIONS_BG_REFRESH_THREADS.pop(cache_key, None)
+        thread = threading.Thread(
+            target=_bg_refresh_cli_sessions,
+            args=(cache_key, ttl, load_sessions, stale_stamp, all_profiles, db_path),
+            daemon=True,
+            name=f"cli-sessions-bg-refresh-{hash(cache_key) & 0xffff:x}",
+        )
+        _CLI_SESSIONS_BG_REFRESH_THREADS[cache_key] = thread
+    thread.start()
+    return True
+
+
+def _bg_refresh_cli_sessions(
+    cache_key: tuple,
+    ttl: float,
+    load_sessions,
+    stale_stamp: int,
+    all_profiles: bool,
+    db_path,
+) -> None:
+    try:
+        invalidation_stamp = _cli_sessions_cache_invalidation_stamp()
+        _load_and_cache_cli_sessions(
+            cache_key=cache_key,
+            ttl=ttl,
+            invalidation_stamp=invalidation_stamp,
+            load_sessions=load_sessions,
+            stale_sessions=None,
+            stale_stamp=stale_stamp,
+            all_profiles=all_profiles,
+            db_path=db_path,
+        )
+    except Exception:
+        logger.warning(
+            "Background CLI-sessions refresh failed (%s)",
+            "all profiles" if all_profiles else db_path,
+            exc_info=True,
+        )
+    finally:
+        with _CLI_SESSIONS_CACHE_LOCK:
+            current = _CLI_SESSIONS_BG_REFRESH_THREADS.get(cache_key)
+            if current is not None and not current.is_alive():
+                _CLI_SESSIONS_BG_REFRESH_THREADS.pop(cache_key, None)
+
+
 def _reload_cli_sessions_after_inflight(
     *,
     cache_key: tuple,
@@ -8097,6 +8170,24 @@ def get_cli_sessions(
                     stale_stamp = cached_stamp
         event, is_owner = _cli_sessions_cache_claim_rebuild(cache_key)
         if is_owner:
+            # Stale-while-revalidate (#sidebar-230s): when a usable stale entry
+            # exists, serve it IMMEDIATELY and refresh in a background thread.
+            # The synchronous owner path made the request wait for its own
+            # IO-starved rebuild (2026-09-14: 230-294s /api/sessions hangs with
+            # a healthy DB — the same queries run in 0.04-2.8s unloaded), while
+            # non-owner waiters already served stale after 0.1-0.25s. First
+            # build (no stale) stays synchronous so cold start still produces a
+            # sidebar instead of an empty flash.
+            if stale_sessions is not None and _serve_stale_and_revalidate_cli(
+                cache_key=cache_key,
+                ttl=ttl,
+                load_sessions=_load_sessions,
+                stale_stamp=stale_stamp,
+                all_profiles=all_profiles,
+                db_path=db_path,
+            ):
+                _cli_sessions_cache_done(cache_key, event)
+                return stale_sessions
             try:
                 invalidation_stamp = _cli_sessions_cache_invalidation_stamp()
                 return _load_and_cache_cli_sessions(
