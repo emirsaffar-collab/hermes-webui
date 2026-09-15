@@ -7203,7 +7203,11 @@ def _load_and_cache_cli_sessions(
     return _copy_cli_sessions(sessions)
 
 
-_CLI_SESSIONS_BG_REFRESH_THREADS: dict[tuple, threading.Thread] = {}
+_CLI_SESSIONS_BG_REFRESH_THREADS: dict[tuple, tuple[threading.Thread, float]] = {}
+# e1 (skeptic deleg_01d53160): a refresh thread wedged on a stuck sqlite call never exits —
+# a pure is_alive() debounce would serve the same stale snapshot forever (the exact
+# IO-starvation this mitigates). A thread older than this age is treated as not in flight
+# and a NEW refresh is scheduled alongside it (last-write-wins via the cache stamp check).
 _CLI_SESSIONS_BG_REFRESH_MAX_AGE_S = 30.0
 
 
@@ -7219,26 +7223,26 @@ def _serve_stale_and_revalidate_cli(
     """Serve the stale entry now and refresh it in a background thread.
 
     Returns True when the caller may serve its ``stale_sessions`` immediately.
-    Debounced: one refresh thread per cache key; a thread younger than
-    ``_CLI_SESSIONS_BG_REFRESH_MAX_AGE_S`` means a refresh is already in flight
-    and the stale entry is simply served again. False only when a background
-    refresh could not be scheduled (caller falls back to the synchronous path).
+    Debounced: one live refresh thread per cache key; a thread wedged longer
+    than ``_CLI_SESSIONS_BG_REFRESH_MAX_AGE_S`` is replaced rather than waited
+    out (a stuck refresh must never pin the sidebar to one stale snapshot).
+    False only when a background refresh could not be scheduled (the caller
+    falls back to the synchronous path).
     """
-    now = time.monotonic()
     with _CLI_SESSIONS_CACHE_LOCK:
         existing = _CLI_SESSIONS_BG_REFRESH_THREADS.get(cache_key)
         if existing is not None:
-            if existing.is_alive():
+            thread, started_at = existing
+            if thread.is_alive() and (time.monotonic() - started_at) < _CLI_SESSIONS_BG_REFRESH_MAX_AGE_S:
                 return True  # refresh already running; keep serving stale
-            # A dead thread record is stale bookkeeping — replace it below.
-            _CLI_SESSIONS_BG_REFRESH_THREADS.pop(cache_key, None)
+            # Dead or wedged-too-long thread record is stale bookkeeping — replace it.
         thread = threading.Thread(
             target=_bg_refresh_cli_sessions,
             args=(cache_key, ttl, load_sessions, stale_stamp, all_profiles, db_path),
             daemon=True,
             name=f"cli-sessions-bg-refresh-{hash(cache_key) & 0xffff:x}",
         )
-        _CLI_SESSIONS_BG_REFRESH_THREADS[cache_key] = thread
+        _CLI_SESSIONS_BG_REFRESH_THREADS[cache_key] = (thread, time.monotonic())
     thread.start()
     return True
 
@@ -7272,7 +7276,7 @@ def _bg_refresh_cli_sessions(
     finally:
         with _CLI_SESSIONS_CACHE_LOCK:
             current = _CLI_SESSIONS_BG_REFRESH_THREADS.get(cache_key)
-            if current is not None and not current.is_alive():
+            if current is not None and current[0] is threading.current_thread():
                 _CLI_SESSIONS_BG_REFRESH_THREADS.pop(cache_key, None)
 
 

@@ -110,7 +110,8 @@ def test_background_refresh_populates_cache(monkeypatch):
     while time.monotonic() < deadline:
         with models._CLI_SESSIONS_CACHE_LOCK:
             threads_alive = [
-                t for t in models._CLI_SESSIONS_BG_REFRESH_THREADS.values() if t.is_alive()
+                t for (t, _started) in models._CLI_SESSIONS_BG_REFRESH_THREADS.values()
+                if t.is_alive()
             ]
         if not threads_alive:
             break
@@ -119,4 +120,67 @@ def test_background_refresh_populates_cache(monkeypatch):
     assert any(s.get("session_id") == "new" for s in served_after), (
         "background refresh must populate the cache for the next request"
     )
+    _reset_caches()
+
+
+def test_wedged_refresh_thread_is_replaced_after_max_age(monkeypatch):
+    """e1: a refresh thread stuck on IO must not pin the sidebar to one stale snapshot.
+
+    A wedged (alive-but-hung) thread older than _CLI_SESSIONS_BG_REFRESH_MAX_AGE_S is
+    replaced by a fresh refresh instead of debouncing forever.
+    """
+    _reset_caches()
+    monkeypatch.setattr(models, '_CLI_SESSIONS_CACHE_TTL_SECONDS', 60.0)
+    monkeypatch.setattr(models, '_CLI_SESSIONS_BG_REFRESH_MAX_AGE_S', 0.05)
+
+    monkeypatch.setattr(
+        models, '_load_cli_sessions_uncached',
+        lambda *a, **k: [{"session_id": "old"}],
+    )
+    get_cli_sessions()  # seed
+    _force_expire_all_entries()
+
+    stuck = threading.Event()
+    real_thread = threading.Thread
+
+    def _wedged_factory(*args, **kwargs):
+        # First background refresh wedges; the second must be scheduled fresh.
+        t = real_thread(*args, **kwargs)
+        original_run = t.run
+
+        def _hung_run():
+            if not stuck.is_set():
+                stuck.set()
+                time.sleep(30)  # simulate a wedged sqlite read
+            else:
+                original_run()
+
+        t.run = _hung_run
+        return t
+
+    monkeypatch.setattr(models.threading, 'Thread', _wedged_factory)
+    monkeypatch.setattr(
+        models, '_load_cli_sessions_uncached',
+        lambda *a, **k: [{"session_id": "new"}],
+    )
+    get_cli_sessions()  # first call: wedged refresh scheduled
+
+    time.sleep(0.1)  # exceed max age while the first thread hangs
+    get_cli_sessions()  # second call must REPLACE the wedged thread, not debounce on it
+
+    # A second (non-wedged) refresh must have been scheduled despite the first hanging.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        with models._CLI_SESSIONS_CACHE_LOCK:
+            entries = list(models._CLI_SESSIONS_BG_REFRESH_THREADS.values())
+        # The wedged thread stays alive; the point is a SECOND entry replaced it in the dict.
+        served_after = get_cli_sessions()
+        if any(s.get("session_id") == "new" for s in served_after):
+            break
+        time.sleep(0.05)
+    served_after = get_cli_sessions()
+    assert any(s.get("session_id") == "new" for s in served_after), (
+        "a wedged refresh thread must be replaced, not waited out forever"
+    )
+    stuck.set()
     _reset_caches()
